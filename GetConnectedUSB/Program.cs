@@ -28,6 +28,8 @@ namespace GetConnectedUSB
     {
         static ManagementEventWatcher insertWatcher = new ManagementEventWatcher();
         static ManagementEventWatcher removeWatcher = new ManagementEventWatcher();
+        static ManagementEventWatcher insertWatcher2 = new ManagementEventWatcher();
+        static ManagementEventWatcher removeWatcher2 = new ManagementEventWatcher();
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
@@ -58,14 +60,20 @@ namespace GetConnectedUSB
                 //Console.WriteLine("Your MagTek device was plugged in.");
             }
 
+        }
+
+        private static void Watcher_EventArrived2(object sender, EventArrivedEventArgs e)
+        {
+
+            ManagementBaseObject instance = (ManagementBaseObject)e.NewEvent["TargetInstance"];
+            Console.WriteLine(instance.Properties["name"].Value);
+
             if (instance.Properties["Name"].Value.ToString() == "USB Printing Support" && !printer1Wrapper.IsOpen)
             {
                 printer1Wrapper.Show("A USB printer was connected!");
                 //MessageBox.Show("A USB input device was disconnected! \nCheck your Card Reader to ensure it's connected!");
                 //Console.WriteLine("Your MagTek device was plugged in.");
             }
-
-
 
         }
 
@@ -79,6 +87,12 @@ namespace GetConnectedUSB
                 //MessageBox.Show("A USB input device was disconnected! \nCheck your Card Reader to ensure it's connected!");
                 //Console.WriteLine("Your MagTek device was plugged in.");
             }
+
+        }
+
+        private static void Watcher_RemovedArrived2(object sender, EventArrivedEventArgs e)
+        {
+            ManagementBaseObject instance = (ManagementBaseObject)e.NewEvent["TargetInstance"];
 
             if (instance.Properties["Name"].Value.ToString() == "USB Printing Support" && !printer2Wrapper.IsOpen)
             {
@@ -121,15 +135,51 @@ namespace GetConnectedUSB
             }
         }
 
+        static public void removeWatcherRunner2()
+        {
+            WqlEventQuery removeQuery = new WqlEventQuery("SELECT * FROM __InstanceDeletionEvent " +
+            "WITHIN 2 "
+            + "WHERE TargetInstance ISA 'Win32_PnPEntity'");
+            //ManagementEventWatcher removeWatcher = new ManagementEventWatcher(removeQuery);
+            removeWatcher2.EventArrived += new EventArrivedEventHandler(Watcher_RemovedArrived2);
+            removeWatcher2.Query = removeQuery;
+            removeWatcher2.Start();
+
+            while (true)
+            {
+                removeWatcher2.WaitForNextEvent();
+            }
+        }
+
+        static public void insertWatcherRunner2()
+        {
+            //ManagementEventWatcher insertWatcher = new ManagementEventWatcher();
+            WqlEventQuery query = new WqlEventQuery("SELECT * FROM __InstanceCreationEvent " +
+            "WITHIN 2 "
+            + "WHERE TargetInstance ISA 'Win32_PnPEntity'");
+            insertWatcher2.EventArrived += new EventArrivedEventHandler(Watcher_EventArrived2);
+            insertWatcher2.Query = query;
+            insertWatcher2.Start();
+
+            while (true)
+            {
+                insertWatcher2.WaitForNextEvent();
+            }
+        }
+
         public static void Main()
         {
             var handle = GetConsoleWindow();
             ShowWindow(handle, SW_HIDE);
 
-            Thread t = new Thread(removeWatcherRunner);
-            t.Start();
+            Thread removeThread1 = new Thread(removeWatcherRunner);
+            Thread removeThread2 = new Thread(removeWatcherRunner2);
+            Thread insertThread1 = new Thread(insertWatcherRunner);
+            removeThread1.Start();
+            removeThread2.Start();
+            insertThread1.Start();
 
-            insertWatcherRunner();
+            insertWatcherRunner2();
 
         }
 
